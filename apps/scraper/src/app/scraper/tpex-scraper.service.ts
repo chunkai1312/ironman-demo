@@ -1,4 +1,5 @@
 import * as numeral from 'numeral';
+import { flatten } from 'lodash';
 import { DateTime } from 'luxon';
 import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
@@ -42,5 +43,54 @@ export class TpexScraperService {
     .find(data => data.date === date) || null;  // 取得目標日期的成交資訊
 
     return data;
+  }
+
+  async fetchTpexInstitutionalInvestorsNetBuySell(date: string) {
+    const dt = DateTime.fromISO(date);
+    const formattedDate = `${dt.get('year') - 1911}/${dt.toFormat('MM')}/${dt.toFormat('dd')}`; // 將 ISO Date 格式轉換成 `民國年//MM`
+    const query = new URLSearchParams({ l: 'zh-tw', t: 'D', d: formattedDate, o: 'json' });     // 建立 URL 查詢參數
+    const url = `https://www.tpex.org.tw/web/stock/3insti/3insti_summary/3itrdsum_result.php?${query}`;
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.get(url))
+      .then(response => (response.data.iTotalRecords > 0) && response.data);
+
+    // 若該日期非交易日或尚無成交資訊則回傳 null
+    if (!responseData) return null;
+
+    // 減少一層陣列嵌套並將 string 格式數字轉換成 number
+    const raw = flatten(responseData.aaData)
+      .map(data => numeral(data).value() || +data)
+      .filter(data => !isNaN(data));
+
+    const [
+      qfiiBuy,      // 外資及陸資合計 買進金額(元)
+      qfiiSell,     // 外資及陸資合計 賣出金額(元)
+      qfiiNet,      // 外資及陸資合計 買賣超(元)
+      fiBuy,        // 外資及陸資(不含自營商) 買進金額(元)
+      fiSell,       // 外資及陸資(不含自營商) 賣出金額(元)
+      fiNet,        // 外資及陸資(不含自營商) 買賣超(元)
+      fdBuy,        // 外資自營商 買進金額(元)
+      fdSell,       // 外資自營商 賣出金額(元)
+      fdNet,        // 外資自營商 買賣超(元)
+      itBuy,        // 投信 買進金額(元)
+      itSell,       // 投信 賣出金額(元)
+      itNet,        // 投信 買賣超(元)
+      dealersBuy,   // 自營商合計 買進金額(元)
+      dealersSell,  // 自營商合計 賣出金額(元)
+      dealersNet,   // 自營商合計 買賣超(元)
+      dpBuy,        // 自營商(自行買賣) 買進金額(元)
+      dpSell,       // 自營商(自行買賣) 賣出金額(元)
+      dpNet,        // 自營商(自行買賣) 買賣超(元)
+      dhBuy,        // 自營商(避險) 買進金額(元)
+      dhSell,       // 自營商(避險) 賣出金額(元)
+      dhNet,        // 自營商(避險) 買賣超(元)
+    ] = raw;
+
+    const qfiiNetBuySell = qfiiNet;         // 外資買賣超
+    const siteNetBuySell = itNet;           // 投信買賣超
+    const dealersNetBuySell = dealersNet;   // 自營商買賣超
+
+    return { date, qfiiNetBuySell, siteNetBuySell, dealersNetBuySell };
   }
 }
