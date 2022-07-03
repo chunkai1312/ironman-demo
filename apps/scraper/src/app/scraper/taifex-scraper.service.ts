@@ -491,4 +491,41 @@ export class TaifexScraperService {
 
     return { date, pcRatio };
   }
+
+  async fetchUsdTwdRate(date: string) {
+    const queryDate = DateTime.fromISO(date).toFormat('yyyy/MM/dd');   // 將 ISO Date 格式轉換成 `yyyy/MM/dd`
+    const url = 'https://www.taifex.com.tw/cht/3/dailyFXRateDown';
+
+    // form data
+    const form = new URLSearchParams({
+      queryStartDate: queryDate,  // 日期(起)
+      queryEndDate: queryDate,    // 日期(迄)
+    });
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.post(url, form, { responseType: 'arraybuffer' }))
+      .then(response => csvtojson({ noheader: true, output: 'csv' }).fromString(iconv.decode(response.data, 'big5')));
+
+    // 若該日期非交易日或尚無資料則回傳 null
+    const [fields, row] = responseData;
+    if (fields[0] !== '日期') return null;
+
+    // 將 string 格式數字轉換成 number
+    const raw = row.slice(1).map(data => numeral(data).value());
+
+    const [
+      usdtwd, // 美元／新台幣
+      cnytwd, // 人民幣／新台幣
+      eurusd, // 歐元／美元
+      usdjpy, // 美元／日幣
+      gbpusd, // 英鎊／美元
+      audusd, // 澳幣／美元
+      usdhkd, // 美元／港幣
+      cnyusd, // 美元／人民幣
+      usdzar, // 美元／南非幣
+      nzdusd, // 紐幣／美元
+    ] = raw;
+
+    return { date, usdtwd };
+  }
 }
