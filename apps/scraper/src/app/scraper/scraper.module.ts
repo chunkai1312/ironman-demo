@@ -4,6 +4,7 @@ import { TwseScraperService } from './twse-scraper.service';
 import { TpexScraperService } from './tpex-scraper.service';
 import { TaifexScraperService } from './taifex-scraper.service';
 import { YahooFinanceService } from './yahoo-finance.service';
+import { InvestingScraperService } from './investing-scraper.service';
 
 @Module({
   imports: [HttpModule],
@@ -12,6 +13,7 @@ import { YahooFinanceService } from './yahoo-finance.service';
     TpexScraperService,
     TaifexScraperService,
     YahooFinanceService,
+    InvestingScraperService,
   ],
 })
 export class ScraperModule {}

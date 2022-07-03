@@ -33,4 +33,30 @@ export class YahooFinanceService {
 
     return { date, dow30, sp500, nasdaq, sox };
   }
+
+  async fetchUsTreasuryYields(date: string) {
+    const dt = DateTime.fromISO(date).endOf('day');
+    const symbols = ['^FVX', '^TNX', '^TYX'];
+
+    // 取得 yahoo finance 歷史報價
+    const quotes = await yahooFinance.historical({
+      symbols,
+      from: dt.toISO(),
+      to: dt.toISO(),
+    }).then(quotes => flatMap(quotes)
+      .filter((quote: any) => DateTime.fromJSDate(quote.date).toISODate() === dt.toISODate())
+      .map((quote: any) => quote.close)
+    );
+
+    // 若非交易日或尚無資料則回傳 null
+    if (!quotes.length) return null;
+
+    const [
+      us5y,   // 美國5年期公債殖利率
+      us10y,  // 美國10年期公債殖利率
+      us20y,  // 美國10年期公債殖利率
+    ] = quotes;
+
+    return { date, us5y, us10y, us20y };
+  }
 }
