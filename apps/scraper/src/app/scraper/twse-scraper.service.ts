@@ -143,4 +143,51 @@ export class TwseScraperService {
 
     return { date, qfiiNetBuySell, siteNetBuySell, dealersNetBuySell };
   }
+
+  async fetchTwseMarginTransactions(date: string) {
+    const query = new URLSearchParams({
+      response: 'json',                                   // 回傳格式為 JSON
+      date: DateTime.fromISO(date).toFormat('yyyyMMdd'),  // 將 ISO Date 格式轉換成 `yyyyMMdd`
+      selectType: 'MS',                                   // 信用交易統計
+    });
+    const url = `https://www.twse.com.tw/en/exchangeReport/MI_MARGN?${query}`;
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.get(url))
+      .then(response => (response.data.stat === 'OK') ? response.data : null);
+
+    // 若該日期非交易日或尚無信用交易統計則回傳 null
+    if (!responseData) return null;
+    if (!responseData.creditList.length) return null;
+
+    // 減少一層陣列嵌套並將 string 格式數字轉換成 number
+    const raw = flatten(responseData.creditList)
+      .map(data => numeral(data).value() || +data)
+      .filter(data => !isNaN(data));
+
+    const [
+      marginPurchase,           // 融資(交易單位)-買進
+      marginSale,               // 融資(交易單位)-賣出
+      cashRedemption,           // 融資(交易單位)-現金(券)償還
+      marginBalancePrev,        // 融資(交易單位)-前日餘額
+      marginBalance,            // 融資(交易單位)-今日餘額
+      shortCovering,            // 融券(交易單位)-買進
+      shortSale,                // 融券(交易單位)-賣出
+      stockRedemption,          // 融券(交易單位)-現金(券)償還
+      shortBalancePrev,         // 融券(交易單位)-前日餘額
+      shortBalance,             // 融券(交易單位)-今日餘額
+      marginPurchaseValue,      // 融資金額(仟元)-買進
+      marginSaleValue,          // 融資金額(仟元)-賣出
+      cashRedemptionValue,      // 融資金額(仟元)-現金(券)償還
+      marginValueBalancePrev,   // 融資金額(仟元)-前日餘額
+      marginValueBalance,       // 融資金額(仟元)-今日餘額
+    ] = raw;
+
+    const margin = marginValueBalance;                                  // 融資餘額
+    const marginChange = marginValueBalance - marginValueBalancePrev;   // 融資餘額增減
+    const short = shortBalance;                                         // 融券餘額
+    const shortChange = shortBalance - shortBalancePrev;                // 融券餘額增減
+
+    return { date, margin, marginChange, short, shortChange };
+  }
 }
