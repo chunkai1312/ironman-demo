@@ -317,4 +317,145 @@ export class TaifexScraperService {
       backMonthsTxSpecificTop10NetOi,
     };
   }
+
+  async fetchTaifexRetailMtxNetOi(date: string) {
+    // 取得全市場及三大法人小型臺指未平倉口數
+    const [ mtxMarketOi, institutionalInvestorsMtxOi ] = await Promise.all([
+      this.fetchTaifexMtxMarketOi(date).then(data => data?.mtxMarketOi),
+      this.fetchTaifexInstitutionalInvestorsMtxOi(date),
+    ]);
+
+    // 若該日期非交易日或尚無資料則回傳 null
+    if (!mtxMarketOi || !institutionalInvestorsMtxOi) return null;
+
+    const {
+      qfiiMtxLongOi,      // 外資小型臺指多方未平倉口數
+      qfiiMtxShortOi,     // 外資小型臺指空方未平倉口數
+      siteMtxLongOi,      // 投信小型臺指多方未平倉口數
+      siteMtxShortOi,     // 投信小型臺指空方未平倉口數
+      dealersMtxLongOi,   // 自營商小型臺指多方未平倉口數
+      dealersMtxShortOi,  // 自營商小型臺指空方未平倉口數
+    } = institutionalInvestorsMtxOi;
+
+    const retailMtxLongOi = mtxMarketOi - (dealersMtxLongOi + siteMtxLongOi + qfiiMtxLongOi);       // 散戶小型臺指多方未平倉口數
+    const retailMtxShortOi = mtxMarketOi - (dealersMtxShortOi + siteMtxShortOi + qfiiMtxShortOi);   // 散戶小型臺指空方未平倉口數
+    const retailMtxNetOi = retailMtxLongOi - retailMtxShortOi;                                      // 散戶小型臺指淨未平倉口數
+    const retailMtxLongShortRatio = Math.round(retailMtxNetOi / mtxMarketOi * 10000) / 10000;       // 散戶小型臺指多空比
+
+    return { date, retailMtxLongOi, retailMtxShortOi, retailMtxNetOi, retailMtxLongShortRatio };
+  }
+
+  async fetchTaifexMtxMarketOi(date: string) {
+    const queryDate = DateTime.fromISO(date).toFormat('yyyy/MM/dd');   // 將 ISO Date 格式轉換成 `yyyy/MM/dd`
+    const url = 'https://www.taifex.com.tw/cht/3/futDataDown';
+
+    // form data
+    const form = new URLSearchParams({
+      down_type: '1',             // 每日行情下載
+      queryStartDate: queryDate,  // 日期(起)
+      queryEndDate: queryDate,    // 日期(迄)
+      commodity_id: 'MTX',        // 小型臺指(MTX)
+    });
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.post(url, form, { responseType: 'arraybuffer' }))
+      .then(response => csvtojson({ noheader: true, output: 'csv' }).fromString(iconv.decode(response.data, 'big5')));
+
+    // 若該日期非交易日或尚無資料則回傳 null
+    const [ fields, ...rows ] = responseData;
+    if (fields[0] !== '交易日期') return null;
+
+    // 計算小型臺指全市場未平倉口數
+    const mtxMarketOi = rows
+      .filter(row => row[17] === '一般' &&  !row[18]) // 僅取日盤並排除價差合約
+      .reduce((oi, row) => oi + numeral(row[11]).value(), 0);
+
+    return { date, mtxMarketOi };
+  }
+
+  async fetchTaifexInstitutionalInvestorsMtxOi(date: string) {
+    const queryDate = DateTime.fromISO(date).toFormat('yyyy/MM/dd');   // 將 ISO Date 格式轉換成 `yyyy/MM/dd`
+    const url = 'https://www.taifex.com.tw/cht/3/futContractsDateDown';
+
+    // form data
+    const form = new URLSearchParams({
+      queryStartDate: queryDate,  // 日期(起)
+      queryEndDate: queryDate,     // 日期(迄)
+      commodityId: 'MXF',         // 小型臺指(MTX)
+    });
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.post(url, form, { responseType: 'arraybuffer' }))
+      .then(response => csvtojson({ noheader: true, output: 'csv' }).fromString(iconv.decode(response.data, 'big5')));
+
+    // 若該日期非交易日或尚無資料則回傳 null
+    const [ fields, dealers, site, qfii ] = responseData;
+    if (fields[0] !== '日期') return null;
+
+    // 合併三大法人數據並將 string 格式數字轉換成 number
+    const raw = [ ...dealers.slice(3), ...site.slice(3), ...qfii.slice(3) ]
+      .map(data => numeral(data).value());
+
+    const [
+      dealersLongTradeVolume,   // 自營商 多方交易口數
+      dealersLongTradeValue,    // 自營商 多方交易契約金額(千元)
+      dealersShortTradeVolume,  // 自營商 空方交易口數
+      dealersShortTradeValue,   // 自營商 空方交易契約金額(千元)
+      dealersNetTradeVolume,    // 自營商 多空交易口數淨額
+      dealersNetTradeValue,     // 自營商 多空交易契約金額淨額(千元)
+      dealersLongOiVolume,      // 自營商 多方未平倉口數
+      dealersLongOiValue,       // 自營商 多方未平倉契約金額(千元)
+      dealersShortOiVolume,     // 自營商 空方未平倉口數
+      dealersShortOiValue,      // 自營商 空方未平倉契約金額(千元)
+      dealersNetOiVolume,       // 自營商 多空未平倉口數淨額
+      dealersNetOiValue,        // 自營商 多空未平倉契約金額淨額(千元)
+      siteLongTradeVolume,      // 投信 多方交易口數
+      siteLongTradeValue,       // 投信 多方交易契約金額(千元)
+      siteShortTradeVolume,     // 投信 空方交易口數
+      siteShortTradeValue,      // 投信 空方交易契約金額(千元)
+      siteNetTradeVolume,       // 投信 多空交易口數淨額
+      siteNetTradeValue,        // 投信 多空交易契約金額淨額(千元)
+      siteLongOiVolume,         // 投信 多方未平倉口數
+      siteLongOiValue,          // 投信 多方未平倉契約金額(千元)
+      siteShortOiVolume,        // 投信 空方未平倉口數
+      siteShortOiValue,         // 投信 空方未平倉契約金額(千元)
+      siteNetOiVolume,          // 投信 多空未平倉口數淨額
+      siteNetOiValue,           // 投信 多空未平倉契約金額淨額(千元)
+      qfiiLongTradeVolume,      // 外資及陸資 多方交易口數
+      qfiiLongTradeValue,       // 外資及陸資 多方交易契約金額(千元)
+      qfiiShortTradeVolume,     // 外資及陸資 空方交易口數
+      qfiiShortTradeValue,      // 外資及陸資 空方交易契約金額(千元)
+      qfiiNetTradeVolume,       // 外資及陸資 多空交易口數淨額
+      qfiiNetTradeValue,        // 外資及陸資 多空交易契約金額淨額(千元)
+      qfiiLongOiVolume,         // 外資及陸資 多方未平倉口數
+      qfiiLongOiValue,          // 外資及陸資 多方未平倉契約金額(千元)
+      qfiiShortOiVolume,        // 外資及陸資 空方未平倉口數
+      qfiiShortOiValue,         // 外資及陸資 空方未平倉契約金額(千元)
+      qfiiNetOiVolume,          // 外資及陸資 多空未平倉口數淨額
+      qfiiNetOiValue,           // 外資及陸資 多空未平倉契約金額淨額(千元)
+    ] = raw;
+
+    const qfiiMtxLongOi = qfiiLongOiVolume;           // 外資小型臺指多方未平倉口數
+    const qfiiMtxShortOi = qfiiShortOiVolume;         // 外資小型臺指空方未平倉口數
+    const qfiiMtxNetOi = qfiiNetOiVolume;             // 外資小型臺指淨未平倉口數
+    const siteMtxLongOi  = siteLongOiVolume;          // 投信小型臺指多方未平倉口數
+    const siteMtxShortOi = siteShortOiVolume;         // 投信小型臺指空方未平倉口數
+    const siteMtxNetOi = siteNetOiVolume;             // 投信小型臺指淨未平倉口數
+    const dealersMtxLongOi = dealersLongOiVolume;     // 自營商小型臺指多方未平倉口數
+    const dealersMtxShortOi = dealersShortOiVolume;   // 自營商小型臺指空方未平倉口數
+    const dealersMtxNetOi = dealersNetOiVolume;       // 自營商小型臺指淨未平倉口數
+
+    return {
+      date,
+      qfiiMtxLongOi,
+      qfiiMtxShortOi,
+      qfiiMtxNetOi,
+      siteMtxLongOi,
+      siteMtxShortOi,
+      siteMtxNetOi,
+      dealersMtxLongOi,
+      dealersMtxShortOi,
+      dealersMtxNetOi,
+    };
+  }
 }
