@@ -11,7 +11,7 @@ export class TpexScraperService {
 
   async fetchTpexMarketTrades(date: string) {
     const dt = DateTime.fromISO(date);
-    const formattedDate = `${dt.get('year') - 1911}/${dt.toFormat('MM')}`;          // 將 ISO Date 格式轉換成 `民國年//MM`
+    const formattedDate = `${dt.get('year') - 1911}/${dt.toFormat('MM')}`;          // 將 ISO Date 格式轉換成 `民國年/MM`
     const query = new URLSearchParams({ l: 'zh-tw', d: formattedDate, o: 'json' }); // 建立 URL 查詢參數
     const url = `https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_index/st41_result.php?${query}`;
 
@@ -47,7 +47,7 @@ export class TpexScraperService {
 
   async fetchTpexInstitutionalInvestorsNetBuySell(date: string) {
     const dt = DateTime.fromISO(date);
-    const formattedDate = `${dt.get('year') - 1911}/${dt.toFormat('MM')}/${dt.toFormat('dd')}`; // 將 ISO Date 格式轉換成 `民國年//MM`
+    const formattedDate = `${dt.get('year') - 1911}/${dt.toFormat('MM')}/${dt.toFormat('dd')}`; // 將 ISO Date 格式轉換成 `民國年/MM/dd`
     const query = new URLSearchParams({ l: 'zh-tw', t: 'D', d: formattedDate, o: 'json' });     // 建立 URL 查詢參數
     const url = `https://www.tpex.org.tw/web/stock/3insti/3insti_summary/3itrdsum_result.php?${query}`;
 
@@ -92,5 +92,49 @@ export class TpexScraperService {
     const dealersNetBuySell = dealersNet;   // 自營商買賣超
 
     return { date, qfiiNetBuySell, siteNetBuySell, dealersNetBuySell };
+  }
+
+  async fetchTpexMarginTransactions(date: string) {
+    const dt = DateTime.fromISO(date);
+    const formattedDate = `${dt.get('year') - 1911}/${dt.toFormat('MM')}/${dt.toFormat('dd')}`; // 將 ISO Date 格式轉換成 `民國年/MM/dd`
+    const query = new URLSearchParams({ l: 'zh-tw', d: formattedDate, o: 'json' });             // 建立 URL 查詢參數
+    const url = `https://www.tpex.org.tw/web/stock/margin_trading/margin_balance/margin_bal_result.php?${query}`;
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.get(url))
+      .then(response => (response.data.iTotalRecords > 0) && response.data);
+
+    // 若該日期非交易日或尚無成交資訊則回傳 null
+    if (!responseData) return null;
+
+    // 取得融資融券統計並將 string 格式數字轉換成 number
+    const raw = [ ...responseData.tfootData_one, ...responseData.tfootData_two ]
+      .map(data => numeral(data).value())
+      .filter(data => data);  // 移除 null 值
+
+    const [
+      marginBalancePrev,        // 融資(交易單位)-前日餘額
+      marginPurchase,           // 融資(交易單位)-買進
+      marginSale,               // 融資(交易單位)-賣出
+      cashRedemption,           // 融資(交易單位)-現金(券)償還
+      marginBalance,            // 融資(交易單位)-今日餘額
+      shortBalancePrev,         // 融券(交易單位)-前日餘額
+      shortCovering,            // 融券(交易單位)-買進
+      shortSale,                // 融券(交易單位)-賣出
+      stockRedemption,          // 融券(交易單位)-現金(券)償還
+      shortBalance,             // 融券(交易單位)-今日餘額
+      marginValueBalancePrev,   // 融資金額(仟元)-前日餘額
+      marginPurchaseValue,      // 融資金額(仟元)-買進
+      marginSaleValue,          // 融資金額(仟元)-賣出
+      cashRedemptionValue,      // 融資金額(仟元)-現金(券)償還
+      marginValueBalance,       // 融資金額(仟元)-今日餘額
+    ] = raw;
+
+    const margin = marginValueBalance;                                  // 融資餘額
+    const marginChange = marginValueBalance - marginValueBalancePrev;   // 融資餘額增減
+    const short = shortBalance;                                         // 融券餘額
+    const shortChange = shortBalance - shortBalancePrev;                // 融券餘額增減
+
+    return { date, margin, marginChange, short, shortChange };
   }
 }
