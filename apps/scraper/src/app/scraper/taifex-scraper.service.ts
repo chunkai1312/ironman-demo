@@ -212,4 +212,109 @@ export class TaifexScraperService {
       dealersTxoPutsNetOiValue,
     };
   }
+
+  async fetchTaifexLargeTraderTxNetOi(date: string) {
+    const queryDate = DateTime.fromISO(date).toFormat('yyyy/MM/dd');   // 將 ISO Date 格式轉換成 `yyyy/MM/dd`
+    const url = 'https://www.taifex.com.tw/cht/3/largeTraderFutDown';
+
+    // form data
+    const form = new URLSearchParams({
+      queryStartDate: queryDate,  // 日期(起)
+      queryEndDate: queryDate,    // 日期(迄)
+    });
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.post(url, form, { responseType: 'arraybuffer' }))
+      .then(response => csvtojson({ noheader: true, output: 'csv' }).fromString(iconv.decode(response.data, 'big5')));
+
+    // 若該日期非交易日或尚無資料則回傳 null
+    const [fields, ...rows] = responseData;
+    if (fields[0] !== '日期') return null;
+
+    const txRows = rows.filter(row => row[1] === 'TX'); // 只取臺股期貨數據
+    const hasWeekContact = (txRows.length > 4); // 確認是否包含一週到期契約
+    const [ frontMonth, frontMonthSpecific, allMonths, allMonthsSpecific ] = hasWeekContact ? txRows.slice(2) : txRows;
+
+    // 合併所有契約數據並將 string 格式數字轉換成 number
+    const raw = [
+      ...frontMonth.slice(5),
+      ...frontMonthSpecific.slice(5),
+      ...allMonths.slice(5),
+      ...allMonthsSpecific.slice(5),
+    ].map(data => numeral(data).value());
+
+    const [
+      frontMonthTop5LongOi,           // 近月契約 前五大交易人買方
+      frontMonthTop5ShortOi,          // 近月契約 前五大交易人賣方
+      frontMonthTop10LongOi,          // 近月契約 前十大交易人買方
+      frontMonthTop10ShortOi,         // 近月契約 前十大交易人賣方
+      frontMonthMarketOi,             // 近月契約 全市場未沖銷部位數
+      frontMonthSpecificTop5LongOi,   // 近月契約 前五大特定法人買方
+      frontMonthSpecificTop5ShortOi,  // 近月契約 前五大特定法人賣方
+      frontMonthSpecificTop10LongOi,  // 近月契約 前十大特定法人買方
+      frontMonthSpecificTop10ShortOi, // 近月契約 前十大特定法人賣方
+      frontMonthSpecificMarketOi,     // 近月契約 全市場未沖銷部位數
+      allMonthsTop5LongOi,            // 全部契約 前五大交易人買方
+      allMonthsTop5ShortOi,           // 全部契約 前五大交易人賣方
+      allMonthsTop10LongOi,           // 全部契約 前十大交易人買方
+      allMonthsTop10ShortOi,          // 全部契約 前十大交易人賣方
+      allMonthsMarketOi,              // 全部契約 全市場未沖銷部位數
+      allMonthsSpecificTop5LongOi,    // 全部契約 前五大特定法人買方
+      allMonthsSpecificTop5ShortOi,   // 全部契約 前五大特定法人賣方
+      allMonthsSpecificTop10LongOi,   // 全部契約 前十大特定法人買方
+      allMonthsSpecificTop10ShortOi,  // 全部契約 前十大特定法人賣方
+      allMonthsSpecificMarketOi,      // 全部契約 全市場未沖銷部位數
+    ] = raw;
+
+    // 計算遠月契約大額交易人未沖銷部位
+    const backMonthsTop5LongOi = allMonthsTop5LongOi - frontMonthTop5LongOi;                                // 遠月契約 前五大交易人買方
+    const backMonthsTop5ShortOi = allMonthsTop5ShortOi - frontMonthTop5ShortOi;                             // 遠月契約 前五大交易人賣方
+    const backMonthsTop10LongOi = allMonthsTop10LongOi - frontMonthTop10LongOi;                             // 遠月契約 前十大交易人買方
+    const backMonthsTop10ShortOi = allMonthsTop10ShortOi - frontMonthTop10ShortOi;                          // 遠月契約 前十大交易人賣方
+    const backMonthsMarketOi = allMonthsMarketOi - frontMonthMarketOi;                                      // 遠月契約 全市場未沖銷部位數
+    const backMonthsSpecificTop5LongOi = allMonthsSpecificTop5LongOi - frontMonthSpecificTop5LongOi;        // 遠月契約 前五大特定法人買方
+    const backMonthsSpecificTop5ShortOi = allMonthsSpecificTop5ShortOi - frontMonthSpecificTop5ShortOi;     // 遠月契約 前五大特定法人賣方
+    const backMonthsSpecificTop10LongOi = allMonthsSpecificTop10LongOi - frontMonthSpecificTop10LongOi;     // 遠月契約 前十大特定法人買方
+    const backMonthsSpecificTop10ShortOi = allMonthsSpecificTop10ShortOi - frontMonthSpecificTop10ShortOi;  // 遠月契約 前十大特定法人賣方
+    const backMonthsSpecificMarketOi = allMonthsSpecificMarketOi - frontMonthSpecificMarketOi;              // 遠月契約 全市場未沖銷部位數
+
+    // 計算近月契約大額交易人淨部位
+    const frontMonthTop5NetOi = frontMonthTop5LongOi - frontMonthTop5ShortOi;                               // 近月契約 前五大交易人淨部位
+    const frontMonthTop10NetOi = frontMonthTop10LongOi - frontMonthTop10ShortOi;                            // 近月契約 前十大特定法人淨部位
+    const frontMonthSpecificTop5NetOi = frontMonthSpecificTop5LongOi - frontMonthSpecificTop5ShortOi;       // 近月契約 前五大特定法人淨部位
+    const frontMonthSpecificTop10NetOi = frontMonthSpecificTop10LongOi - frontMonthSpecificTop10ShortOi;    // 近月契約 前十大特定法人淨部位
+
+    // 計算全部契約大額交易人淨部位
+    const allMonthsTop5NetOi = allMonthsTop5LongOi - allMonthsTop5ShortOi;                                  // 全部契約 前五大交易人淨部位
+    const allMonthsTop10NetOi = allMonthsTop10LongOi - allMonthsTop10ShortOi;                               // 全部契約 前十大特定法人淨部位
+    const allMonthsSpecificTop5NetOi = allMonthsSpecificTop5LongOi - allMonthsSpecificTop5ShortOi;          // 全部契約 前五大特定法人淨部位
+    const allMonthsSpecificTop10NetOi = allMonthsSpecificTop10LongOi - allMonthsSpecificTop10ShortOi;       // 全部契約 前十大特定法人淨部位
+
+    // 計算遠月契約大額交易人淨部位
+    const backMonthsTop5NetOi = backMonthsTop5LongOi - backMonthsTop5ShortOi;                                   // 遠月契約 前五大交易人淨部位
+    const backMonthsTop10NetOi = backMonthsTop10LongOi - backMonthsTop10ShortOi;                                // 遠月契約 前十大特定法人淨部位
+    const backMonthsSpecificTop5NetOi = backMonthsSpecificTop5LongOi - backMonthsSpecificTop5ShortOi;           // 遠月契約 前五大特定法人淨部位
+    const backMonthsSpecificTop10NetOi = backMonthsSpecificTop10LongOi - backMonthsSpecificTop10ShortOi;        // 遠月契約 前十大特定法人淨部位
+
+    const frontMonthTxTop5NetOi = frontMonthTop5NetOi;                    // 近月臺股期貨前五大交易人淨部位
+    const frontMonthTxTop10NetOi = frontMonthTop10NetOi;                  // 近月臺股期貨前十大交易人淨部位
+    const frontMonthTxSpecificTop5NetOi = frontMonthSpecificTop5NetOi;    // 近月臺股期貨前五大特定法人淨部位
+    const frontMonthTxSpecificTop10NetOi = frontMonthSpecificTop10NetOi;  // 近月臺股期貨前十大特定法人淨部位
+    const backMonthsTxTop5NetOi = backMonthsTop5NetOi;                    // 遠月臺股期貨前五大交易人淨部位
+    const backMonthsTxTop10NetOi = backMonthsTop10NetOi;                  // 遠月臺股期貨前十大交易人淨部位
+    const backMonthsTxSpecificTop5NetOi = backMonthsSpecificTop5NetOi;    // 遠月臺股期貨前十大特定法人淨部位
+    const backMonthsTxSpecificTop10NetOi = backMonthsSpecificTop10NetOi;  // 遠月臺股期貨前十大特定法人淨部位
+
+    return {
+      date,
+      frontMonthTxTop5NetOi,
+      frontMonthTxTop10NetOi,
+      frontMonthTxSpecificTop5NetOi,
+      frontMonthTxSpecificTop10NetOi,
+      backMonthsTxTop5NetOi,
+      backMonthsTxTop10NetOi,
+      backMonthsTxSpecificTop5NetOi,
+      backMonthsTxSpecificTop10NetOi,
+    };
+  }
 }
