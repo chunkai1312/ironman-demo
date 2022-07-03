@@ -61,6 +61,27 @@ export class TwseScraperService {
     return data;
   }
 
+  async fetchIndexList() {
+    const url = 'https://isin.twse.com.tw/isin/C_public.jsp?strMode=11';
+
+    // 取得 HTML 並轉換為 Big-5 編碼
+    const page = await firstValueFrom(this.httpService.get(url, { responseType: 'arraybuffer' }))
+      .then(response => iconv.decode(response.data, 'big5'));
+
+    // 使用 cheerio 載入 HTML 以取得表格的 table rows
+    const $ = cheerio.load(page);
+    const rows = $('.h4 tr');
+
+    // 遍歷每個 table row 並將其轉換成我們想要的資料格式
+    const data = rows.slice(1).map((i, el) => {
+      const td = $(el).find('td');
+      const [ symbol, name ] = td.eq(0).text().trim().split('　');  // 取出指數代碼與名稱
+      return { symbol, name };
+    }).toArray();
+
+    return data;
+  }
+
   async fetchTwseMarketTrades(date: string) {
     const query = new URLSearchParams({
       response: 'json',                                   // 回傳格式為 JSON
