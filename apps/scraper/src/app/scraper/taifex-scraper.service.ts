@@ -340,7 +340,7 @@ export class TaifexScraperService {
     const retailMtxLongOi = mtxMarketOi - (dealersMtxLongOi + siteMtxLongOi + qfiiMtxLongOi);       // 散戶小型臺指多方未平倉口數
     const retailMtxShortOi = mtxMarketOi - (dealersMtxShortOi + siteMtxShortOi + qfiiMtxShortOi);   // 散戶小型臺指空方未平倉口數
     const retailMtxNetOi = retailMtxLongOi - retailMtxShortOi;                                      // 散戶小型臺指淨未平倉口數
-    const retailMtxLongShortRatio = Math.round(retailMtxNetOi / mtxMarketOi * 10000) / 10000;       // 散戶小型臺指多空比
+    const retailMtxLongShortRatio = Math.round(retailMtxNetOi / mtxMarketOi * 10000) / 100;         // 散戶小型臺指多空比
 
     return { date, retailMtxLongOi, retailMtxShortOi, retailMtxNetOi, retailMtxLongShortRatio };
   }
@@ -380,7 +380,7 @@ export class TaifexScraperService {
     // form data
     const form = new URLSearchParams({
       queryStartDate: queryDate,  // 日期(起)
-      queryEndDate: queryDate,     // 日期(迄)
+      queryEndDate: queryDate,    // 日期(迄)
       commodityId: 'MXF',         // 小型臺指(MTX)
     });
 
@@ -457,5 +457,38 @@ export class TaifexScraperService {
       dealersMtxShortOi,
       dealersMtxNetOi,
     };
+  }
+
+  async fetchTaifexTxoPcRatio(date: string) {
+    const queryDate = DateTime.fromISO(date).toFormat('yyyy/MM/dd');   // 將 ISO Date 格式轉換成 `yyyy/MM/dd`
+    const url = 'https://www.taifex.com.tw/cht/3/pcRatioDown';
+
+    // form data
+    const form = new URLSearchParams({
+      queryStartDate: queryDate,  // 日期(起)
+      queryEndDate: queryDate,    // 日期(迄)
+    });
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.post(url, form, { responseType: 'arraybuffer' }))
+      .then(response => csvtojson({ noheader: true, output: 'csv' }).fromString(iconv.decode(response.data, 'big5')));
+
+    // 若該日期非交易日或尚無資料則回傳 null
+    const [ fields, row ] = responseData;
+    if (!row) return null;
+
+    // 將 string 格式數字轉換成 number
+    const raw = row.slice(1).map(data => numeral(data).value());
+
+    const [
+      putVolume,      // 賣權成交量
+      callVolume,     // 買權成交量
+      pcVolumeRatio,  // 買賣權成交量比率%
+      putOi,          // 賣權未平倉量
+      callOi,         // 買權未平倉量
+      pcRatio,        // 買賣權未平倉量比率%
+    ] = raw;
+
+    return { date, pcRatio };
   }
 }
