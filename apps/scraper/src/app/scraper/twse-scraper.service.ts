@@ -1,6 +1,7 @@
 import * as numeral from 'numeral';
 import * as cheerio from 'cheerio';
 import * as iconv from 'iconv-lite';
+import { flatten } from 'lodash';
 import { DateTime } from 'luxon';
 import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
@@ -96,5 +97,50 @@ export class TwseScraperService {
       .find(data => data.date === date) || null;  // 取得目標日期的成交資訊
 
     return data;
+  }
+
+  async fetchTwseInstitutionalInvestorsNetBuySell(date: string) {
+    const query = new URLSearchParams({
+      response: 'json',                                       // 回傳格式為 JSON
+      type: 'day',                                            // 日報表
+      dayDate: DateTime.fromISO(date).toFormat('yyyyMMdd'),   // 將 ISO Date 格式轉換成 `yyyyMMdd`
+    });
+    const url = `https://www.twse.com.tw/fund/BFI82U?${query}`;
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.get(url))
+      .then(response => (response.data.stat === 'OK') && response.data);
+
+    // 若該日期非交易日或尚無成交資訊則回傳 null
+    if (!responseData) return null;
+
+    // 減少一層陣列嵌套並將 string 格式數字轉換成 number
+    const raw = flatten(responseData.data)
+      .map(data => numeral(data).value() || +data)
+      .filter(data => !isNaN(data));
+
+    const [
+      dpBuy,  // 自營商(自行買賣) 買進金額
+      dpSell, // 自營商(自行買賣) 賣出金額
+      dpNet,  // 自營商(自行買賣) 買賣差額
+      dhBuy,  // 自營商(避險) 買進金額
+      dhSell, // 自營商(避險) 賣出金額
+      dhNet,  // 自營商(避險) 買賣差額
+      itBuy,  // 投信 買進金額
+      itSell, // 投信 賣出金額
+      itNet,  // 投信 買賣差額
+      fiBuy,  // 外資及陸資(不含外資自營商) 買進金額
+      fiSell, // 外資及陸資(不含外資自營商) 賣出金額
+      fiNet,  // 外資及陸資(不含外資自營商) 買賣差額
+      fdBuy,  // 外資自營商 買進金額
+      fdSell, // 外資自營商 賣出金額
+      fdNet,  // 外資自營商 買賣差額
+    ] = raw;
+
+    const qfiiNetBuySell = fiNet + fdNet;     // 外資買賣超
+    const siteNetBuySell = itNet;             // 投信買賣超
+    const dealersNetBuySell = dpNet + dhNet;  // 自營商買賣超
+
+    return { date, qfiiNetBuySell, siteNetBuySell, dealersNetBuySell };
   }
 }
