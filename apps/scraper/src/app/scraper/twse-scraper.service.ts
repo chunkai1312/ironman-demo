@@ -429,6 +429,38 @@ export class TwseScraperService {
     return data;
   }
 
+  async fetchTwseEquitiesValues(date: string) {
+    const query = new URLSearchParams({
+      response: 'json',                                   // 回傳格式為 JSON
+      date: DateTime.fromISO(date).toFormat('yyyyMMdd'),  // 將 ISO Date 格式轉換成 `yyyyMMdd`
+      selectType: 'ALL',                                  // 全部
+    });
+    const url = `https://www.twse.com.tw/exchangeReport/BWIBBU_d?${query}`;
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.get(url))
+      .then((response) => (response.data.stat === 'OK' ? response.data : null));
+
+    // 若該日期非交易日或尚無成交資訊則回傳 null
+    if (!responseData) return null;
+
+    // 將回應資料整理成我們想要的資料格式
+    const data = responseData.data.reduce((tickers, row) => {
+      const [ symbol, name, dividendYield, dividendYear, peRatio, pbRatio, fiscalYearQuarter ] = row;
+      const ticker = {
+        date,
+        symbol,
+        name,
+        peRatio: numeral(peRatio).value(),
+        pbRatio: numeral(pbRatio).value(),
+        dividendYield: numeral(dividendYield).value(),
+      };
+      return [ ...tickers, ticker ];
+    }, []);
+
+    return data;
+  }
+
   private getSymbolByIndexName(name: string) {
     const indices = {
       '水泥類指數': 'IX0010',
