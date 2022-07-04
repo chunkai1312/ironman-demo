@@ -272,6 +272,42 @@ export class TpexScraperService {
     return data;
   }
 
+  async fetchTpexEquitiesQuotes(date: string) {
+    const dt = DateTime.fromISO(date);
+    const formattedDate = `${dt.get('year') - 1911}/${dt.toFormat('MM/dd')}`;                   // 將 ISO Date 格式轉換成 `民國年/MM/dd`
+    const query = new URLSearchParams({ l: 'zh-tw', d: formattedDate, se: 'EW', o: 'json' });   // 建立 URL 查詢參數
+    const url = `https://www.tpex.org.tw/web/stock/aftertrading/otc_quotes_no1430/stk_wn1430_result.php?${query}`;
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.get(url))
+      .then(response => (response.data.iTotalRecords > 0) ? response.data : null);
+
+    // 若該日期非交易日或尚無成交資訊則回傳 null
+    if (!responseData) return null;
+
+    // 將回應資料整理成我們想要的資料格式
+    const data = responseData.aaData.map(row => {
+      const [ symbol, name, closePrice, change, openPrice, highPrice, lowPrice, tradeVolume, tradeValue, transaction ] = row;
+      const changePercent = Math.round(parseFloat((numeral(change).value() / (numeral(closePrice).value() - numeral(change).value())).toPrecision(12)) * 10000) / 100;
+      return {
+        date,
+        symbol,
+        name,
+        openPrice: numeral(openPrice).value(),
+        highPrice: numeral(highPrice).value(),
+        lowPrice: numeral(lowPrice).value(),
+        closePrice: numeral(closePrice).value(),
+        change: numeral(change).value(),
+        changePercent: isNaN(changePercent) ? 0 : changePercent,
+        tradeVolume: numeral(tradeVolume).value(),
+        tradeValue: numeral(tradeValue).value(),
+        transaction: numeral(transaction).value(),
+      };
+    });
+
+    return data;
+  }
+
   private getSymbolBySectorName(name: string) {
     // 無對應指數: 塑膠工業, 橡膠工業, 油電燃氣業, 貿易百貨, 貿易百貨, 金融業, 電器電纜, 電子商務, 食品工業
     const indices = {
