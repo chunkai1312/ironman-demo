@@ -357,6 +357,46 @@ export class TwseScraperService {
     return data;
   }
 
+  async fetchTwseEquitiesQuotes(date: string) {
+    const query = new URLSearchParams({
+      response: 'json',                                   // 回傳格式為 JSON
+      date: DateTime.fromISO(date).toFormat('yyyyMMdd'),  // 將 ISO Date 格式轉換成 `yyyyMMdd`
+      type: 'ALLBUT0999',                                 // 全部(不含權證、牛熊證、可展延牛熊證)
+    });
+    const url = `https://www.twse.com.tw/exchangeReport/MI_INDEX?${query}`;
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.get(url))
+      .then(response => (response.data.stat === 'OK') ? response.data : null);
+
+    // 若該日期非交易日或尚無成交資訊則回傳 null
+    if (!responseData) return null;
+
+    // 將回應資料整理成我們想要的資料格式
+    const data = responseData.data9.map(row => {
+      const [ symbol, name, tradeVolume, transaction, tradeValue, openPrice, highPrice, lowPrice, closePrice, upDown, change ] = row;
+      const netChange = upDown.includes('green') ? numeral(change).value() * -1 : numeral(change).value();  // 計算漲跌
+      const referencePrice = numeral(closePrice).value() - netChange;   // 回推參考價
+      const changePercent = Math.round(parseFloat((netChange / referencePrice).toPrecision(12)) * 10000) / 100; // 計算漲跌幅
+      return {
+        date,
+        symbol,
+        name,
+        openPrice: numeral(openPrice).value(),
+        highPrice: numeral(highPrice).value(),
+        lowPrice: numeral(lowPrice).value(),
+        closePrice: numeral(closePrice).value(),
+        change: netChange,
+        changePercent: isNaN(changePercent) ? 0 : changePercent,
+        tradeVolume: numeral(tradeVolume).value(),
+        tradeValue: numeral(tradeValue).value(),
+        transaction: numeral(transaction).value(),
+      };
+    });
+
+    return data;
+  }
+
   private getSymbolByIndexName(name: string) {
     const indices = {
       '水泥類指數': 'IX0010',
