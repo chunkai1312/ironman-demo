@@ -228,4 +228,72 @@ export class TpexScraperService {
 
     return data;
   }
+
+  async fetchTpexIndustrialIndicesTrades(date: string) {
+    const dt = DateTime.fromISO(date);
+    const formattedDate = `${dt.get('year') - 1911}/${dt.toFormat('MM/dd')}`;         // 將 ISO Date 格式轉換成 `民國年/MM/dd`
+    const query = new URLSearchParams({ l: 'zh-tw', d: formattedDate, o: 'json' });   // 建立 URL 查詢參數
+    const url = `https://www.tpex.org.tw/web/stock/historical/trading_vol_ratio/sectr_result.php?${query}`;
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.get(url))
+      .then(response => (response.data.iTotalRecords > 0) ? response.data : null);
+
+    // 若該日期非交易日或尚無成交資訊則回傳 null
+    if (!responseData) return null;
+
+    // 將回應資料整理成我們想要的資料格式
+    const indices = responseData.aaData.map(row => {
+      const [ name, tradeValue, tradeValueWeight, tradeVolume, tradeVolumeWeight ] = row;
+      return {
+        date,
+        symbol: this.getSymbolBySectorName(name),
+        tradeVolume: numeral(tradeVolume).value(),
+        tradeValue: numeral(tradeValue).value(),
+        tradeWeight: numeral(tradeValueWeight).value(),
+      };
+    });
+
+    // 計算電子工業成交量值
+    const electronic = indices.reduce((trades, data) => {
+      return ['IX0053', 'IX0054', 'IX0055', 'IX0056', 'IX0057', 'IX0058', 'IX0059', 'IX0099'].includes(data.symbol)
+        ? { ...trades,
+          tradeVolume: trades.tradeVolume + data.tradeVolume,
+          tradeValue: trades.tradeValue + data.tradeValue,
+          tradeWeight: trades.tradeWeight + data.tradeWeight,
+        } : trades;
+    }, { date, symbol: 'IX0047', tradeVolume: 0, tradeValue: 0, tradeWeight: 0 });
+
+    indices.push(electronic);
+
+    // 過濾無對應指數的產業別
+    const data = indices.filter(index => index.symbol);
+
+    return data;
+  }
+
+  private getSymbolBySectorName(name: string) {
+    // 無對應指數: 塑膠工業, 橡膠工業, 油電燃氣業, 貿易百貨, 貿易百貨, 金融業, 電器電纜, 電子商務, 食品工業
+    const indices = {
+      '光電業': 'IX0055',
+      '其他': 'IX0100',
+      '其他電子業': 'IX0099',
+      '化學工業': 'IX0051',
+      '半導體業': 'IX0053',
+      '建材營造': 'IX0048',
+      '文化創意業': 'IX0075',
+      '生技醫療': 'IX0052',
+      '紡織纖維': 'IX0044',
+      '航運業': 'IX0049',
+      '觀光事業': 'IX0050',
+      '資訊服務業': 'IX0059',
+      '通信網路業': 'IX0056',
+      '鋼鐵工業': 'IX0046',
+      '電子通路業': 'IX0058',
+      '電子零組件業': 'IX0057',
+      '電機機械': 'IX0045',
+      '電腦及週邊設備業': 'IX0054',
+    };
+    return indices[name];
+  }
 }
