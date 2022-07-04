@@ -324,4 +324,75 @@ export class TwseScraperService {
 
     return data;
   }
+
+  async fetchTwseIndustrialIndicesTrades(date: string) {
+    const query = new URLSearchParams({
+      response: 'json',                                   // 回傳格式為 JSON
+      date: DateTime.fromISO(date).toFormat('yyyyMMdd'),  // 將 ISO Date 格式轉換成 `yyyyMMdd`
+    });
+    const url = `https://www.twse.com.tw/exchangeReport/BFIAMU?${query}`;
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.get(url))
+      .then(response => (response.data.stat === 'OK') ? response.data : null);
+
+    // 若該日期非交易日或尚無成交資訊則回傳 null
+    if (!responseData) return null;
+
+    // 取得市場成交量值
+    const taiex = await this.fetchTwseMarketTrades(date);
+
+    // 將回應資料整理成我們想要的資料格式
+    const data = responseData.data.map(row => {
+      const [ name, tradeVolume, tradeValue, transaction, change ] = row;
+      return {
+        date,
+        symbol: this.getSymbolByIndexName(name.trim()),
+        tradeVolume: numeral(tradeVolume).value(),
+        tradeValue: numeral(tradeValue).value(),
+        tradeWeight: Math.round(parseFloat((numeral(tradeValue).value() / taiex.tradeValue).toPrecision(12)) * 10000) / 100,
+      };
+    });
+
+    return data;
+  }
+
+  private getSymbolByIndexName(name: string) {
+    const indices = {
+      '水泥類指數': 'IX0010',
+      '食品類指數': 'IX0011',
+      '塑膠類指數': 'IX0012',
+      '紡織纖維類指數': 'IX0016',
+      '電機機械類指數': 'IX0017',
+      '電器電纜類指數': 'IX0018',
+      '化學生技醫療類指數': 'IX0019',
+      '化學類指數': 'IX0020',
+      '生技醫療類指數': 'IX0021',
+      '玻璃陶瓷類指數': 'IX0022',
+      '造紙類指數': 'IX0023',
+      '鋼鐵類指數': 'IX0024',
+      '橡膠類指數': 'IX0025',
+      '汽車類指數': 'IX0026',
+      '電子類指數': 'IX0027',
+      '半導體類指數': 'IX0028',
+      '電腦及週邊設備類指數': 'IX0029',
+      '光電類指數': 'IX0030',
+      '通信網路類指數': 'IX0031',
+      '電子零組件類指數': 'IX0032',
+      '電子通路類指數': 'IX0033',
+      '資訊服務類指數': 'IX0034',
+      '其他電子類指數': 'IX0035',
+      '建材營造類指數': 'IX0036',
+      '航運業類指數': 'IX0037',
+      '觀光事業類指數': 'IX0038',
+      '金融保險類指數': 'IX0039',
+      '貿易百貨類指數': 'IX0040',
+      '油電燃氣類指數': 'IX0041',
+      '其他類指數': 'IX0042',
+      '電子工業類指數': 'IX0027', // 電子類指數
+      '航運類指數': 'IX0037',    // 航運業類指數
+      '觀光類指數': 'IX0038',    // 觀光事業類指數
+    };
+    return indices[name];
+  }
 }
