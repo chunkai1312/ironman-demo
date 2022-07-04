@@ -338,6 +338,36 @@ export class TpexScraperService {
     return data;
   }
 
+  async fetchTpexEquitiesValues(date: string) {
+    const dt = DateTime.fromISO(date);
+    const formattedDate = `${dt.get('year') - 1911}/${dt.toFormat('MM/dd')}`;
+    const query = new URLSearchParams({ l: 'zh-tw', o: 'json', d: formattedDate });   // 建立 URL 查詢參數
+    const url = `https://www.tpex.org.tw/web/stock/aftertrading/peratio_analysis/pera_result.php?${query}`;
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.get(url))
+      .then((response) => response.data.iTotalRecords > 0 ? response.data : null);
+
+    // 若該日期非交易日或尚無成交資訊則回傳 null
+    if (!responseData) return null;
+
+    // 將回應資料整理成我們想要的資料格式
+    const data = responseData.aaData.reduce((tickers, row) => {
+      const [ symbol, name, peRatio, dividendPerShare, dividendYear, dividendYield, pbRatio ] = row;
+      const ticker = {
+        date,
+        symbol,
+        name,
+        dividendYield: numeral(dividendYield).value(),
+        peRatio: numeral(peRatio).value(),
+        pbRatio: numeral(pbRatio).value(),
+      };
+      return [ ...tickers, ticker ];
+    }, []);
+
+    return data;
+  }
+
   private getSymbolBySectorName(name: string) {
     // 無對應指數: 塑膠工業, 橡膠工業, 油電燃氣業, 貿易百貨, 貿易百貨, 金融業, 電器電纜, 電子商務, 食品工業
     const indices = {
