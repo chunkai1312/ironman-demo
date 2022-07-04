@@ -308,6 +308,36 @@ export class TpexScraperService {
     return data;
   }
 
+  async fetchTpexEquitiesInstitutionalInvestorsNetBuySell(date: string) {
+    const dt = DateTime.fromISO(date);
+    const formattedDate = `${dt.get('year') - 1911}/${dt.toFormat('MM/dd')}`;
+    const query = new URLSearchParams({ l: 'zh-tw', o: 'json', se: 'EW', t: 'D', d: formattedDate });   // 建立 URL 查詢參數
+    const url = `https://www.tpex.org.tw/web/stock/3insti/daily_trade/3itrade_hedge_result.php?${query}`;
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.get(url))
+      .then((response) => response.data.iTotalRecords > 0 ? response.data : null);
+
+    // 若該日期非交易日或尚無成交資訊則回傳 null
+    if (!responseData) return null;
+
+    // 將回應資料整理成我們想要的資料格式
+    const data = responseData.aaData.reduce((tickers, raw) => {
+      const [ symbol, name, fiBuy, fiSell, fiNet, fdBuy, fdSell, fdNet, fBuy, fSell, fNet, itBuy, itSell, itNet, dpBuy, dpSell, dpNet, dhBuy, dhSell, dhNet, dBuy, dSell, dNet, totalNet ] = raw;
+      const ticker = {
+        date,
+        symbol,
+        name,
+        qfiiNetBuySell: Math.round((numeral(fiNet).value() + numeral(fdNet).value()) / 1000),
+        siteNetBuySell: Math.round(numeral(itNet).value() / 1000),
+        dealersNetBuySell: Math.round(numeral(dNet).value() / 1000),
+      };
+      return [ ...tickers, ticker ];
+    }, []);
+
+    return data;
+  }
+
   private getSymbolBySectorName(name: string) {
     // 無對應指數: 塑膠工業, 橡膠工業, 油電燃氣業, 貿易百貨, 貿易百貨, 金融業, 電器電纜, 電子商務, 食品工業
     const indices = {
