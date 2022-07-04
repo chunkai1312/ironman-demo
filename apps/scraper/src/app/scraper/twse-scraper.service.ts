@@ -397,6 +397,38 @@ export class TwseScraperService {
     return data;
   }
 
+  async fetchTwseEquitiesInstitutionalInvestorsNetBuySell(date: string) {
+    const query = new URLSearchParams({
+      response: 'json',                                   // 回傳格式為 JSON
+      date: DateTime.fromISO(date).toFormat('yyyyMMdd'),  // 將 ISO Date 格式轉換成 `yyyyMMdd`
+      selectType: 'ALLBUT0999',                           // 全部(不含權證、牛熊證、可展延牛熊證)
+    });
+    const url = `https://www.twse.com.tw/fund/T86?${query}`;
+
+    // 取得回應資料
+    const responseData = await firstValueFrom(this.httpService.get(url))
+      .then((response) => (response.data.stat === 'OK' ? response.data : null));
+
+    // 若該日期非交易日或尚無成交資訊則回傳 null
+    if (!responseData) return null;
+
+    // 將回應資料整理成我們想要的資料格式
+    const data = responseData.data.reduce((tickers, row) => {
+      const [ symbol, name, fiBuy, fiSell, fiNet, fdBuy, fdSell, fdNet, itBuy, itSell, itNet, dNet, dpBuy, dpSell, dpNet, dhBuy, dhSell, dhNet, totalNet ] = row;
+      const ticker = {
+        date,
+        symbol,
+        name: name.trim(),
+        qfiiNetBuySell: Math.round((numeral(fiNet).value() + numeral(fdNet).value()) / 1000),
+        siteNetBuySell: Math.round(numeral(itNet).value() / 1000),
+        dealersNetBuySell: Math.round(numeral(dNet).value() / 1000),
+      };
+      return [ ...tickers, ticker ];
+    }, []);
+
+    return data;
+  }
+
   private getSymbolByIndexName(name: string) {
     const indices = {
       '水泥類指數': 'IX0010',
