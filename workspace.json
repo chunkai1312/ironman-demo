@@ -1,6 +1,8 @@
 {
   "version": 2,
   "projects": {
-    "scraper": "apps/scraper"
+    "monitor": "apps/monitor",
+    "scraper": "apps/scraper",
+    "trader": "apps/trader"
   }
 }
