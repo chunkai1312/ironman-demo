@@ -100,20 +100,20 @@ export class TwseScraperService {
     const data = responseData.data
       .map(row => {
         // 欄位依序為: 日期, 成交股數, 成交金額, 成交筆數, 發行量加權股價指數, 漲跌點數
-        const [ date, tradeVolume, tradeValue, transaction, price, change ] = row;
+        const [ date, ...values ] = row;
 
         // 將 `民國年/MM/dd` 的日期格式轉換成 `yyyy-MM-dd`
         const [ year, month, day ] = date.split('/');
         const formattedDate = DateTime.fromFormat(`${+year + 1911}${month}${day}`, 'yyyyMMdd').toISODate();
 
-        return {
-          date: formattedDate,
-          tradeVolume: numeral(tradeVolume).value(),
-          tradeValue: numeral(tradeValue).value(),
-          transaction: numeral(transaction).value(),
-          price: numeral(price).value(),
-          change: numeral(change).value(),
-        };
+        // 轉為數字格式
+        const [ tradeVolume, tradeValue, transaction, price, change ] = values.map(value => numeral(value).value());
+
+        // 計算漲跌幅
+        const previousClose = price - change; // 前次交易日收盤價
+        const changePercent = Math.round(change / previousClose * 10000) / 100;
+
+        return { date: formattedDate, tradeVolume, tradeValue, transaction, price, change, changePercent };
       })
       .find(data => data.date === date) || null;  // 取得目標日期的成交資訊
 

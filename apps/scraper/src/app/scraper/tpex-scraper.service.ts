@@ -24,21 +24,21 @@ export class TpexScraperService {
 
     // 將回應資料整理成我們想要的資料格式
     const data = responseData.aaData.map(row => {
-      // 欄位依序為: 日期, 成交股數(仟股), 金額(仟元), 筆數, 櫃買指數, 漲/跌
-      const [ date, tradeVolume, tradeValue, transaction, price, change ] = row;
+      // 欄位依序為: 日期, 成交股數, 金額, 筆數, 櫃買指數, 漲/跌
+      const [ date, ...values ] = row;
 
       // 將 `民國年/MM/dd` 的日期格式轉換成 `yyyy-MM-dd`
       const [ year, month, day ] = date.split('/');
       const formattedDate = DateTime.fromFormat(`${+year + 1911}${month}${day}`, 'yyyyMMdd').toISODate();
 
-      return {
-        date: formattedDate,
-        tradeVolume: numeral(tradeVolume).value(),
-        tradeValue: numeral(tradeValue).value(),
-        transaction: numeral(transaction).value(),
-        price: numeral(price).value(),
-        change: numeral(change).value(),
-      };
+      // 轉為數字格式
+      const [ tradeVolume, tradeValue, transaction, price, change ] = values.map(value => numeral(value).value());
+
+      // 計算漲跌幅
+      const previousClose = price - change; // 前次交易日收盤價
+      const changePercent = Math.round(change / previousClose * 10000) / 100;
+
+      return { date: formattedDate, tradeVolume, tradeValue, transaction, price, change, changePercent };
     })
     .find(data => data.date === date) || null;  // 取得目標日期的成交資訊
 

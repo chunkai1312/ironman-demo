@@ -19,5 +19,14 @@ import { InvestingScraperService } from './investing-scraper.service';
     YahooFinanceService,
     InvestingScraperService,
   ],
+  exports: [
+    TwseScraperService,
+    TpexScraperService,
+    TaifexScraperService,
+    MopsScraperService,
+    TdccScraperService,
+    YahooFinanceService,
+    InvestingScraperService,
+  ],
 })
 export class ScraperModule {}

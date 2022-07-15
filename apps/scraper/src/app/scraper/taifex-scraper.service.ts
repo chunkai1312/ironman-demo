@@ -187,7 +187,7 @@ export class TaifexScraperService {
     const siteTxoCallsNetOi = siteCallsNetOiVolume;             // 投信臺指選擇權買權未平倉口數
     const dealersTxoCallsNetOi = dealersCallsNetOiVolume;       // 自營商臺指選擇權買權未平倉口數
     const qfiiTxoPutsNetOi = qfiiPutsNetOiVolume;               // 外資臺指選擇權賣權未平倉口數
-    const iteTxoPutsNetOi = sitePutsNetOiVolume;                // 投信臺指選擇權賣權未平倉口數
+    const siteTxoPutsNetOi = sitePutsNetOiVolume;                // 投信臺指選擇權賣權未平倉口數
     const dealersTxoPutsNetOi = dealersPutsNetOiVolume;         // 自營商臺指選擇權賣權未平倉口數
     const qfiiTxoCallsNetOiValue = qfiiCallsNetOiValue;         // 外資臺指選擇權買權未平倉契約金額
     const siteTxoCallsNetOiValue = siteCallsNetOiValue;         // 投信臺指選擇權買權未平倉契約金額
@@ -202,7 +202,7 @@ export class TaifexScraperService {
       siteTxoCallsNetOi,
       dealersTxoCallsNetOi,
       qfiiTxoPutsNetOi,
-      iteTxoPutsNetOi,
+      siteTxoPutsNetOi,
       dealersTxoPutsNetOi,
       qfiiTxoCallsNetOiValue,
       siteTxoCallsNetOiValue,
@@ -459,7 +459,7 @@ export class TaifexScraperService {
     };
   }
 
-  async fetchTaifexTxoPcRatio(date: string) {
+  async fetchTaifexTxoPutCallRatio(date: string) {
     const queryDate = DateTime.fromISO(date).toFormat('yyyy/MM/dd');   // 將 ISO Date 格式轉換成 `yyyy/MM/dd`
     const url = 'https://www.taifex.com.tw/cht/3/pcRatioDown';
 
@@ -481,15 +481,15 @@ export class TaifexScraperService {
     const raw = row.slice(1).map(data => numeral(data).value());
 
     const [
-      putVolume,      // 賣權成交量
-      callVolume,     // 買權成交量
-      pcVolumeRatio,  // 買賣權成交量比率%
-      putOi,          // 賣權未平倉量
-      callOi,         // 買權未平倉量
-      pcRatio,        // 買賣權未平倉量比率%
+      txoPutVolume,           // 賣權成交量
+      txoCallVolume,          // 買權成交量
+      txoPutCallVolumeRatio,  // 買賣權成交量比率%
+      txoPutOi,               // 賣權未平倉量
+      txoCallOi,              // 買權未平倉量
+      txoPutCallRatio,        // 買賣權未平倉量比率%
     ] = raw;
 
-    return { date, pcRatio };
+    return { date, txoPutCallRatio };
   }
 
   async fetchUsdTwdRate(date: string) {
