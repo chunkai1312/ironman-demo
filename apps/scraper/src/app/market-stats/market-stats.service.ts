@@ -1,9 +1,7 @@
 import { DateTime } from 'luxon';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, QueryOptions } from 'mongoose';
-import { MarketStats, MarketStatsDocument } from './market-stats.schema';
+import { MarketStatsRepository } from './market-stats.repository';
 import { TwseScraperService } from '../scraper/twse-scraper.service';
 import { TaifexScraperService } from '../scraper/taifex-scraper.service';
 import { InvestingScraperService } from '../scraper/investing-scraper.service';
@@ -11,11 +9,15 @@ import { InvestingScraperService } from '../scraper/investing-scraper.service';
 @Injectable()
 export class MarketStatsService {
   constructor(
-    @InjectModel(MarketStats.name) private readonly marketStatsModel: Model<MarketStatsDocument>,
+    private readonly marketStatsRepository: MarketStatsRepository,
     private readonly twseScraperService: TwseScraperService,
     private readonly taifexScraperService: TaifexScraperService,
     private readonly investingScraperService: InvestingScraperService,
   ) {}
+
+  async onApplicationBootstrap() {
+    await this.updateMarketStats();
+  }
 
   async updateMarketStats(date: string = DateTime.local().toISODate()) {
     const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -38,12 +40,13 @@ export class MarketStatsService {
   async updateTaiex(date: string) {
     const updated = await this.twseScraperService.fetchTwseMarketTrades(date)
       .then(data => data && {
+        date,
         taiexPrice: data.price,
         taiexChange: data.change,
         taiexChangePercent: data.changePercent,
         taiexTradeValue: data.tradeValue,
       })
-      .then(data => data && this.saveMarketStats(data))
+      .then(data => data && this.marketStatsRepository.updateMarketStats(data))
 
     if (updated) Logger.log(`${date} 加權指數: 已更新`, MarketStatsService.name);
     else Logger.warn(`${date} 加權指數: 尚無資料或非交易日`, MarketStatsService.name);
@@ -58,7 +61,7 @@ export class MarketStatsService {
         siteNetBuySell: data.siteNetBuySell,
         dealersNetBuySell: data.dealersNetBuySell,
       })
-      .then(data => data && this.saveMarketStats(data))
+      .then(data => data && this.marketStatsRepository.updateMarketStats(data))
 
     if (updated) Logger.log(`${date} 三大法人買賣超: 已更新`, MarketStatsService.name);
     else Logger.warn(`${date} 三大法人買賣超: 尚無資料或非交易日`, MarketStatsService.name);
@@ -74,7 +77,7 @@ export class MarketStatsService {
         short: data.short,
         shortChange: data.shortChange,
       })
-      .then(data => data && this.saveMarketStats(data));
+      .then(data => data && this.marketStatsRepository.updateMarketStats(data));
 
     if (updated) Logger.log(`${date} 信用交易: 已更新`, MarketStatsService.name);
     else Logger.warn(`${date} 信用交易: 尚無資料或非交易日`, MarketStatsService.name);
@@ -87,7 +90,7 @@ export class MarketStatsService {
         date,
         qfiiTxNetOi: data.qfiiTxNetOi,
       })
-      .then(data => data && this.saveMarketStats(data));
+      .then(data => data && this.marketStatsRepository.updateMarketStats(data));
 
     if (updated) Logger.log(`${date} 外資台指期淨未平倉: 已更新`, MarketStatsService.name);
     else Logger.warn(`${date} 外資台指期淨未平倉: 尚無資料或非交易日`, MarketStatsService.name);
@@ -101,7 +104,7 @@ export class MarketStatsService {
         qfiiTxoCallsNetOiValue: data.qfiiTxoCallsNetOiValue,
         qfiiTxoPutsNetOiValue: data.qfiiTxoPutsNetOiValue,
       })
-      .then(data => data && this.saveMarketStats(data));
+      .then(data => data && this.marketStatsRepository.updateMarketStats(data));
 
     if (updated) Logger.log(`${date} 外資台指選擇權淨未平倉: 已更新`, MarketStatsService.name);
     else Logger.warn(`${date} 外資台指選擇權淨未平倉: 尚無資料或非交易日`, MarketStatsService.name);
@@ -115,7 +118,7 @@ export class MarketStatsService {
         specificTop10TxFrontMonthNetOi: data.frontMonthTxSpecificTop10NetOi,
         specificTop10TxBackMonthsNetOi: data.backMonthsTxSpecificTop10NetOi,
       })
-      .then(data => data && this.saveMarketStats(data));
+      .then(data => data && this.marketStatsRepository.updateMarketStats(data));
 
     if (updated) Logger.log(`${date} 十大特法台指期淨未平倉: 已更新`, MarketStatsService.name);
     else Logger.warn(`${date} 十大特法台指期淨未平倉: 尚無資料或非交易日`, MarketStatsService.name);
@@ -129,7 +132,7 @@ export class MarketStatsService {
         retailMtxNetOi: data.retailMtxNetOi,
         retailMtxLongShortRatio: data.retailMtxLongShortRatio,
       })
-      .then(data => data && this.saveMarketStats(data));
+      .then(data => data && this.marketStatsRepository.updateMarketStats(data));
 
     if (updated) Logger.log(`${date} 散戶小台淨部位: 已更新`, MarketStatsService.name);
     else Logger.warn(`${date} 散戶小台淨部位: 尚無資料或非交易日`, MarketStatsService.name);
@@ -142,7 +145,7 @@ export class MarketStatsService {
         date,
         txoPutCallRatio: data.txoPutCallRatio,
       })
-      .then(data => data && this.saveMarketStats(data));
+      .then(data => data && this.marketStatsRepository.updateMarketStats(data));
 
     if (updated) Logger.log(`${date} 台指選擇權 Put/Call Ratio: 已更新`, MarketStatsService.name);
     else Logger.warn(`${date} 台指選擇權 Put/Call Ratio: 尚無資料或非交易日`, MarketStatsService.name);
@@ -155,7 +158,7 @@ export class MarketStatsService {
         date,
         usdtwd: data.usdtwd,
       })
-      .then(data => data && this.saveMarketStats(data));
+      .then(data => data && this.marketStatsRepository.updateMarketStats(data));
 
     if (updated) Logger.log(`${date} 美元兌新台幣: 已更新`, MarketStatsService.name);
     else Logger.warn(`${date} 美元兌新台幣: 尚無資料或非交易日`, MarketStatsService.name);
@@ -170,13 +173,9 @@ export class MarketStatsService {
         us2y: data.us2y,
         us10y: data.us10y,
       })
-      .then(data => data && this.saveMarketStats(data));
+      .then(data => data && this.marketStatsRepository.updateMarketStats(data));
 
     if (updated) Logger.log(`${date} 美國公債殖利率: 已更新`, MarketStatsService.name);
     else Logger.warn(`${date} 美國公債殖利率: 尚無資料或非交易日`, MarketStatsService.name);
-  }
-
-  private async saveMarketStats(update: any, options?: QueryOptions): Promise<any> {
-    return this.marketStatsModel.updateOne({ date: update.date }, update, { ...options, upsert: true });
   }
 }

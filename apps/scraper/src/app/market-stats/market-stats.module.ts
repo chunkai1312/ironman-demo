@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MarketStats, MarketStatsSchema } from './market-stats.schema';
 import { MarketStatsService } from './market-stats.service';
+import { MarketStatsRepository } from './market-stats.repository';
 import { ScraperModule } from '../scraper/scraper.module';
 
 @Module({
@@ -11,7 +12,7 @@ import { ScraperModule } from '../scraper/scraper.module';
     ]),
     ScraperModule,
   ],
-  providers: [MarketStatsService],
-  exports: [MarketStatsService],
+  providers: [MarketStatsService, MarketStatsRepository],
+  exports: [MarketStatsService, MarketStatsRepository],
 })
 export class MarketStatsModule {}
