@@ -11,5 +11,6 @@ import { ScraperModule } from '../scraper/scraper.module';
     ScraperModule,
   ],
   providers: [TickerService],
+  exports: [TickerService],
 })
 export class TickerModule {}

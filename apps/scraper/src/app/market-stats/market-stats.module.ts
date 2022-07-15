@@ -12,5 +12,6 @@ import { ScraperModule } from '../scraper/scraper.module';
     ScraperModule,
   ],
   providers: [MarketStatsService],
+  exports: [MarketStatsService],
 })
 export class MarketStatsModule {}
