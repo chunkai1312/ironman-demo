@@ -17,7 +17,7 @@ export class Ticker {
   @Prop()
   market: string;
 
-  @Prop({ required: true })
+  @Prop()
   symbol: string;
 
   @Prop()
