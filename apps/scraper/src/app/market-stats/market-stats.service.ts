@@ -15,10 +15,6 @@ export class MarketStatsService {
     private readonly investingScraperService: InvestingScraperService,
   ) {}
 
-  async onApplicationBootstrap() {
-    await this.updateMarketStats();
-  }
-
   async updateMarketStats(date: string = DateTime.local().toISODate()) {
     const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
