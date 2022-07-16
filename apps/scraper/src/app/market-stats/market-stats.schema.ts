@@ -9,16 +9,13 @@ export class MarketStats {
   date: string;
 
   @Prop()
-  taiexPrice: string;
+  taiexPrice: number;
 
   @Prop()
   taiexChange: number;
 
   @Prop()
-  taiexChangePercent: string;
-
-  @Prop()
-  taiexTradeValue: string;
+  taiexTradeValue: number;
 
   @Prop()
   qfiiNetBuySell: number;
