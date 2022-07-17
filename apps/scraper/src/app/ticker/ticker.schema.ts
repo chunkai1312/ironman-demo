@@ -3,7 +3,7 @@ import { Document } from 'mongoose';
 
 export type TickerDocument = Ticker & Document;
 
-@Schema()
+@Schema({ timestamps: true })
 export class Ticker {
   @Prop({ required: true })
   date: string;

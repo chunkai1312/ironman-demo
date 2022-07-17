@@ -1,6 +1,7 @@
 {
   "version": 2,
   "projects": {
+    "common": "libs/common",
     "monitor": "apps/monitor",
     "scraper": "apps/scraper",
     "trader": "apps/trader"

@@ -340,7 +340,7 @@ export class TaifexScraperService {
     const retailMtxLongOi = mtxMarketOi - (dealersMtxLongOi + siteMtxLongOi + qfiiMtxLongOi);       // 散戶小型臺指多方未平倉口數
     const retailMtxShortOi = mtxMarketOi - (dealersMtxShortOi + siteMtxShortOi + qfiiMtxShortOi);   // 散戶小型臺指空方未平倉口數
     const retailMtxNetOi = retailMtxLongOi - retailMtxShortOi;                                      // 散戶小型臺指淨未平倉口數
-    const retailMtxLongShortRatio = Math.round(retailMtxNetOi / mtxMarketOi * 10000) / 100;         // 散戶小型臺指多空比
+    const retailMtxLongShortRatio = Math.round(retailMtxNetOi / mtxMarketOi * 10000) / 10000;       // 散戶小型臺指多空比
 
     return { date, retailMtxLongOi, retailMtxShortOi, retailMtxNetOi, retailMtxLongShortRatio };
   }
@@ -481,13 +481,15 @@ export class TaifexScraperService {
     const raw = row.slice(1).map(data => numeral(data).value());
 
     const [
-      txoPutVolume,           // 賣權成交量
-      txoCallVolume,          // 買權成交量
-      txoPutCallVolumeRatio,  // 買賣權成交量比率%
-      txoPutOi,               // 賣權未平倉量
-      txoCallOi,              // 買權未平倉量
-      txoPutCallRatio,        // 買賣權未平倉量比率%
+      txoPutVolume,                   // 賣權成交量
+      txoCallVolume,                  // 買權成交量
+      txoPutCallVolumeRatioPercent,   // 買賣權成交量比率%
+      txoPutOi,                       // 賣權未平倉量
+      txoCallOi,                      // 買權未平倉量
+      txoPutCallRatioPercent,         // 買賣權未平倉量比率%
     ] = raw;
+
+    const txoPutCallRatio = numeral(txoPutCallRatioPercent).divide(100).value()
 
     return { date, txoPutCallRatio };
   }

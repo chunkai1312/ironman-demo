@@ -29,7 +29,7 @@ export class TickerService {
   @Cron('0 0 14 * * *')
   async updateTwseIndexQuotes(date: string) {
     const updated = await this.twseScraperService.fetchTwseIndicesQuotes(date)
-      .then(data => data && { ...data, type: TickerType.Index, exchange: Exchange.TWSE, market: Market.TSE })
+      .then(data => data && data.map(ticker => ({ ...ticker, type: TickerType.Index, exchange: Exchange.TWSE, market: Market.TSE })))
       .then(data => data && Promise.all(data.map(ticker => this.tickerRepository.updateTicker(ticker))));
 
     if (updated) Logger.log(`${date} 上市指數收盤行情: 已更新`, TickerService.name);
@@ -39,7 +39,7 @@ export class TickerService {
   @Cron('0 0 14 * * *')
   async updateTpexIndexQuotes(date: string) {
     const updated = await this.tpexScraperService.fetchTpexIndicesQuotes(date)
-      .then(data => data && { ...data, type: TickerType.Index, exchange: Exchange.TPEx, market: Market.OTC })
+      .then(data => data && data.map(ticker => ({ ...ticker, type: TickerType.Index, exchange: Exchange.TPEx, market: Market.OTC })))
       .then(data => data && Promise.all(data.map(ticker => this.tickerRepository.updateTicker(ticker))));
 
     if (updated) Logger.log(`${date} 上櫃指數收盤行情: 已更新`, TickerService.name);
@@ -87,7 +87,7 @@ export class TickerService {
   @Cron('0 0 15 * * *')
   async updateTwseSectorTrades(date: string) {
     const updated = await this.twseScraperService.fetchTwseIndustrialIndicesTrades(date)
-      .then(data => data && { ...data, type: TickerType.Index, exchange: Exchange.TWSE, market: Market.TSE })
+      .then(data => data && data.map(ticker => ({ ...ticker, type: TickerType.Index, exchange: Exchange.TWSE, market: Market.TSE })))
       .then(data => data && Promise.all(data.map(ticker => this.tickerRepository.updateTicker(ticker))));
 
     if (updated) Logger.log(`${date} 上市類股成交量值: 已更新`, TickerService.name);
@@ -97,7 +97,7 @@ export class TickerService {
   @Cron('0 0 15 * * *')
   async updateTpexSectorTrades(date: string) {
     const updated = await this.tpexScraperService.fetchTpexIndustrialIndicesTrades(date)
-      .then(data => data && { ...data, type: TickerType.Index, exchange: Exchange.TPEx, market: Market.OTC })
+      .then(data => data && data.map(ticker => ({ ...ticker, type: TickerType.Index, exchange: Exchange.TPEx, market: Market.OTC })))
       .then(data => data && Promise.all(data.map(ticker => this.tickerRepository.updateTicker(ticker))));
 
     if (updated) Logger.log(`${date} 上櫃類股成交量值: 已更新`, TickerService.name);
@@ -107,7 +107,7 @@ export class TickerService {
   @Cron('0 0 15-21/2 * * *')
   async updateTwseEquityQuotes(date: string) {
     const updated = await this.twseScraperService.fetchTwseEquitiesQuotes(date)
-      .then(data => data && { ...data, type: TickerType.Equity, exchange: Exchange.TWSE, market: Market.TSE })
+      .then(data => data && data.map(ticker => ({ ...ticker, type: TickerType.Equity, exchange: Exchange.TWSE, market: Market.TSE })))
       .then(data => data && Promise.all(data.map(ticker => this.tickerRepository.updateTicker(ticker))));
 
     if (updated) Logger.log(`${date} 上市個股收盤行情: 已更新`, TickerService.name);
@@ -117,7 +117,7 @@ export class TickerService {
   @Cron('0 0 15-21/2 * * *')
   async updateTpexEquityQuotes(date: string) {
     const updated = await this.tpexScraperService.fetchTpexEquitiesQuotes(date)
-      .then(data => data && { ...data, type: TickerType.Equity, exchange: Exchange.TPEx, market: Market.OTC })
+      .then(data => data && data.map(ticker => ({ ...ticker, type: TickerType.Equity, exchange: Exchange.TPEx, market: Market.OTC })))
       .then(data => data && Promise.all(data.map(ticker => this.tickerRepository.updateTicker(ticker))));
 
     if (updated) Logger.log(`${date} 上櫃個股收盤行情: 已更新`, TickerService.name);
@@ -127,7 +127,7 @@ export class TickerService {
   @Cron('0 30 16 * * *')
   async updateTwseEquityInstiNetBuySell(date: string) {
     const updated = await this.twseScraperService.fetchTwseEquitiesInstitutionalInvestorsNetBuySell(date)
-      .then(data => data && { ...data, type: TickerType.Equity, exchange: Exchange.TWSE, market: Market.TSE })
+      .then(data => data && data.map(ticker => ({ ...ticker, type: TickerType.Equity, exchange: Exchange.TWSE, market: Market.TSE })))
       .then(data => data && Promise.all(data.map(ticker => this.tickerRepository.updateTicker(ticker))));
 
     if (updated) Logger.log(`${date} 上市個股法人進出: 已更新`, TickerService.name);
@@ -137,7 +137,7 @@ export class TickerService {
   @Cron('0 30 16 * * *')
   async updateTpexEquityInstiNetBuySell(date: string) {
     const updated = await this.tpexScraperService.fetchTpexEquitiesInstitutionalInvestorsNetBuySell(date)
-      .then(data => data && { ...data, type: TickerType.Equity, exchange: Exchange.TPEx, market: Market.OTC })
+      .then(data => data && data.map(ticker => ({ ...ticker, type: TickerType.Equity, exchange: Exchange.TPEx, market: Market.OTC })))
       .then(data => data && Promise.all(data.map(ticker => this.tickerRepository.updateTicker(ticker))));
 
     if (updated) Logger.log(`${date} 上櫃個股法人進出: 已更新`, TickerService.name);

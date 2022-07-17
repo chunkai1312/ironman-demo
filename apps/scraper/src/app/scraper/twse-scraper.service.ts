@@ -419,9 +419,9 @@ export class TwseScraperService {
         date,
         symbol,
         name: name.trim(),
-        qfiiNetBuySell: Math.round((numeral(fiNet).value() + numeral(fdNet).value()) / 1000),
-        siteNetBuySell: Math.round(numeral(itNet).value() / 1000),
-        dealersNetBuySell: Math.round(numeral(dNet).value() / 1000),
+        qfiiNetBuySell: numeral(fiNet).value() + numeral(fdNet).value(),
+        siteNetBuySell: numeral(itNet).value(),
+        dealersNetBuySell: numeral(dNet).value(),
       };
       return [ ...tickers, ticker ];
     }, []);

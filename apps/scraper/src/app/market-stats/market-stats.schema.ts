@@ -27,16 +27,16 @@ export class MarketStats {
   dealersNetBuySell: number;
 
   @Prop()
-  marginPurchase: number;
+  margin: number;
 
   @Prop()
-  marginPurchaseChange: number;
+  marginChange: number;
 
   @Prop()
-  shortSale: number;
+  short: number;
 
   @Prop()
-  shortSaleChange: number;
+  shortChange: number;
 
   @Prop()
   qfiiTxNetOi: number;
